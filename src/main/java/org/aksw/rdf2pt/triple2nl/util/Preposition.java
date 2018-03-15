@@ -30,6 +30,8 @@ import java.util.HashSet;
  */
 public class Preposition extends HashSet<String> {
 
+	private static final long serialVersionUID = 1L;
+	
 	private static final String filename = "preposition_list.txt";
 
 	public Preposition(InputStream is) {

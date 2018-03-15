@@ -1129,11 +1129,11 @@ public class TripleConverterPortuguese {
 		BufferedReader br = null;
 		String line = "";
 		String cvsSplitBy = ",";
-		List<String> lines = new ArrayList<>();
-		List<String> uris = new ArrayList<>();
-		List<String> triplas = new ArrayList<>();
+//		List<String> lines = new ArrayList<>();
+//		List<String> uris = new ArrayList<>();
+//		List<String> triplas = new ArrayList<>();
 		String[] resource = new String[3];
-		int i = 0;
+//		int i = 0;
 
 		try {
 

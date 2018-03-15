@@ -10,7 +10,6 @@ import simplenlg.framework.NLGFactory;
 import simplenlg.lexicon.Lexicon;
 import simplenlg.lexicon.portuguese.XMLLexicon;
 import simplenlg.phrasespec.VPPhraseSpec;
-import simplenlg.realiser.Realiser;
 
 public class SingleExample2 {
 
@@ -25,7 +24,7 @@ public class SingleExample2 {
 		long endTime;
 		double elapsed;
 
-		Realiser realiser = new Realiser();
+//		Realiser realiser = new Realiser();
 
 		System.out.println("constructing lexicon");
 		startTime = System.nanoTime();
@@ -44,7 +43,7 @@ public class SingleExample2 {
 
 		System.out.println("realising example");
 		startTime = System.nanoTime();
-		String r = realiser.realise(caber).getRealisation();
+//		String r = realiser.realise(caber).getRealisation();
 		endTime = System.nanoTime();
 		elapsed = (endTime - startTime) / 1000000000.0;
 		System.out.println("example realised");

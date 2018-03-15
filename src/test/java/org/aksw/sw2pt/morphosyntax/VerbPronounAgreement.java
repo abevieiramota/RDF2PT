@@ -19,9 +19,8 @@
 
 package org.aksw.sw2pt.morphosyntax;
 
+import org.junit.Assert;
 import org.junit.Test;
-
-import junit.framework.Assert;
 
 /**
  * This jUnit class tests verb-pronoun agreement, so that features for person,

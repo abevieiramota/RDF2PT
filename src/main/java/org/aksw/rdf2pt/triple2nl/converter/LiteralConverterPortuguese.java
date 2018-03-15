@@ -19,7 +19,6 @@
  */
 package org.aksw.rdf2pt.triple2nl.converter;
 
-import java.text.DateFormat;
 import java.text.DateFormatSymbols;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -58,7 +57,7 @@ public class LiteralConverterPortuguese {
 	private static final Locale PORTUGUESE_LOCAL = new Locale("pt", "BR");
 	private static final Logger logger = LoggerFactory.getLogger(LiteralConverterPortuguese.class);
 	private IRIConverter iriConverter;
-	private DateFormat dateFormat = DateFormat.getDateInstance(DateFormat.LONG, PORTUGUESE_LOCAL);
+//	private DateFormat dateFormat = DateFormat.getDateInstance(DateFormat.LONG, PORTUGUESE_LOCAL);
 	private boolean encapsulateStringLiterals = true;
 
 	public LiteralConverterPortuguese(IRIConverter iriConverter) {

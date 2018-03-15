@@ -24,9 +24,7 @@ package org.aksw.rdf2pt.triple2nl;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.util.ArrayList;
-
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -44,7 +42,6 @@ import org.aksw.rdf2pt.triple2nl.converter.IRIConverter;
 import org.aksw.rdf2pt.triple2nl.gender.DictionaryBasedGenderDetector;
 import org.aksw.rdf2pt.triple2nl.gender.Gender;
 import org.aksw.rdf2pt.triple2nl.gender.GenderDetector;
-import org.apache.jena.atlas.logging.Log;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
@@ -54,9 +51,6 @@ import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.rdf.model.StmtIterator;
 import org.apache.jena.vocabulary.RDF;
 import org.dllearner.kb.sparql.SparqlEndpoint;
-import org.jgrapht.alg.ConnectivityInspector;
-import org.jgrapht.graph.DefaultDirectedGraph;
-import org.jgrapht.graph.DefaultEdge;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
@@ -119,12 +113,12 @@ public class DocumentGeneratorPortuguese {
 
 	public String generateDocument(Set<Triple> documentTriples) throws IOException {
 		
-		DefaultDirectedGraph<Node, DefaultEdge> graph = asGraph(documentTriples);
+//		DefaultDirectedGraph<Node, DefaultEdge> graph = asGraph(documentTriples);
 
 		// divide the document into paragraphs for each connected component in
 		// the graph
-		ConnectivityInspector<Node, DefaultEdge> connectivityInspector = new ConnectivityInspector<>(graph);
-		List<Set<Node>> connectedNodes = connectivityInspector.connectedSets();
+//		ConnectivityInspector<Node, DefaultEdge> connectivityInspector = new ConnectivityInspector<>(graph);
+//		List<Set<Node>> connectedNodes = connectivityInspector.connectedSets();
 
 		// for (Set<Node> nodes : connectedNodes) {
 		// System.out.println(nodes);
@@ -357,18 +351,18 @@ public class DocumentGeneratorPortuguese {
 		return subject2Triples.asMap();
 	}
 
-	private DefaultDirectedGraph<Node, DefaultEdge> asGraph(Set<Triple> triples) {
-		DefaultDirectedGraph<Node, DefaultEdge> graph = new DefaultDirectedGraph<>(DefaultEdge.class);
-		for (Triple triple : triples) {
-			// we have to omit type triples to get connected subgraphs later on
-			if (!triple.predicateMatches(RDF.type.asNode())) {
-				graph.addVertex(triple.getSubject());
-				graph.addVertex(triple.getObject());
-				graph.addEdge(triple.getSubject(), triple.getObject());
-			}
-		}
-		return graph;
-	}
+//	private DefaultDirectedGraph<Node, DefaultEdge> asGraph(Set<Triple> triples) {
+//		DefaultDirectedGraph<Node, DefaultEdge> graph = new DefaultDirectedGraph<>(DefaultEdge.class);
+//		for (Triple triple : triples) {
+//			// we have to omit type triples to get connected subgraphs later on
+//			if (!triple.predicateMatches(RDF.type.asNode())) {
+//				graph.addVertex(triple.getSubject());
+//				graph.addVertex(triple.getObject());
+//				graph.addEdge(triple.getSubject(), triple.getObject());
+//			}
+//		}
+//		return graph;
+//	}
 
 	public static void main(String[] args) throws Exception {
 		String triples = "@prefix dbr: <http://dbpedia.org/resource/>." + "@prefix dbo: <http://dbpedia.org/ontology/>."

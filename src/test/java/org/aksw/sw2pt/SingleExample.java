@@ -52,8 +52,8 @@ public class SingleExample {
 		}
 
 		// EX100
-		String target100 = "Mariah Carey é uma cantora.";
-		String gloss100 = "Mariah Carey is a singer.";
+//		String target100 = "Mariah Carey é uma cantora.";
+//		String gloss100 = "Mariah Carey is a singer.";
 		SPhraseSpec ex100 = nlgFactory.createClause();
 		NPPhraseSpec subject100 = nlgFactory.createNounPhrase("Mariah Carey");
 		// subject100.setFeature(Feature.PERSON, Person.THIRD);

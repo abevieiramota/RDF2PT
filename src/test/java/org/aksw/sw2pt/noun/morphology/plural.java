@@ -19,9 +19,9 @@
 
 package org.aksw.sw2pt.noun.morphology;
 
+import org.junit.Assert;
 import org.junit.Test;
 
-import junit.framework.Assert;
 import simplenlg.features.Feature;
 import simplenlg.features.NumberAgreement;
 

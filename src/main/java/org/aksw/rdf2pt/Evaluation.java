@@ -10,7 +10,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.ParseException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -32,7 +31,7 @@ public class Evaluation {
         List<String> lines = new ArrayList<>();
         List<String> triplas = new ArrayList<>();
         		//Arrays.asList("Scientists");
-        int i = 0;
+//        int i = 0;
         
         try {
 

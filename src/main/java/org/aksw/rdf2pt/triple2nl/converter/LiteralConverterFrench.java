@@ -19,7 +19,6 @@
  */
 package org.aksw.rdf2pt.triple2nl.converter;
 
-import java.text.DateFormat;
 import java.text.DateFormatSymbols;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -58,7 +57,7 @@ public class LiteralConverterFrench {
 	private static final Locale FRENCH_LOCAL = Locale.FRENCH;
 	private static final Logger logger = LoggerFactory.getLogger(LiteralConverterFrench.class);
 	private IRIConverter iriConverter;
-	private DateFormat dateFormat = DateFormat.getDateInstance(DateFormat.LONG, FRENCH_LOCAL);
+//	private DateFormat dateFormat = DateFormat.getDateInstance(DateFormat.LONG, FRENCH_LOCAL);
 	private boolean encapsulateStringLiterals = true;
 
 	public LiteralConverterFrench(IRIConverter iriConverter) {

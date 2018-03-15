@@ -13,8 +13,8 @@ public class Gtranslate {
 	
 	 public static void main(String[] args) throws Exception {
 		 
-	  Gtranslate http = new Gtranslate();
-	  String word = http.callUrlAndParseResult("auto", "pt", "dela");
+//	  Gtranslate http = new Gtranslate();
+//	  String word = http.callUrlAndParseResult("auto", "pt", "dela");
 	  //System.out.println(word);
 	 }
 	 

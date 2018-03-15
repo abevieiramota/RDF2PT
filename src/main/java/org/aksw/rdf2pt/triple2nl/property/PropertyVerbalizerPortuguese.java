@@ -23,28 +23,17 @@ import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
-import java.util.Set;
 
 import org.aksw.jena_sparql_api.core.QueryExecutionFactory;
 import org.aksw.jena_sparql_api.http.QueryExecutionFactoryHttp;
-import org.aksw.rdf2pt.Sparql;
-import org.aksw.rdf2pt.triple2nl.DocumentGeneratorPortuguese;
 import org.aksw.rdf2pt.triple2nl.converter.DefaultIRIConverterPortuguese;
 import org.aksw.rdf2pt.triple2nl.converter.IRIConverter;
 import org.aksw.rdf2pt.triple2nl.util.Preposition;
 import org.aksw.rdf2pt.utils.nlp.pos.TreeTagger;
-import org.apache.jena.graph.Triple;
 import org.apache.log4j.Logger;
-import org.dllearner.kb.sparql.SparqlEndpoint;
 
 //import edu.stanford.nlp.ling.CoreAnnotations.*;
 //import edu.stanford.nlp.ling.CoreLabel;
@@ -345,10 +334,10 @@ public class PropertyVerbalizerPortuguese {
 	        BufferedReader br = null;
 	        String line = "";
 	        String cvsSplitBy = ",";
-	        List<String> lines = new ArrayList<>();
+//	        List<String> lines = new ArrayList<>();
 	        List<String> uris = new ArrayList<>();
-	        List<String> triplas = new ArrayList<>();
-	        int i = 0;
+//	        List<String> triplas = new ArrayList<>();
+//	        int i = 0;
 	        
 	        try {
 

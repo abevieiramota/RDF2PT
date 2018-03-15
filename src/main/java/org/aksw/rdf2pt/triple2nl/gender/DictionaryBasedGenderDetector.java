@@ -22,12 +22,6 @@
  */
 package org.aksw.rdf2pt.triple2nl.gender;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.HashSet;
-import java.util.Set;
-
 /**
  * Detects the gender based on two lists of common names for male and female.
  *

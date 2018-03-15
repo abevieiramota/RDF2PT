@@ -5,14 +5,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-
 import org.annolab.tt4j.TokenHandler;
 import org.annolab.tt4j.TreeTaggerException;
 import org.annolab.tt4j.TreeTaggerWrapper;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 import com.aliasi.tag.Tagging;
 
@@ -20,7 +16,7 @@ public class TreeTagger implements PartOfSpeechTagger {
 
 	TreeTaggerWrapper<String> tt;
 
-	private static final Logger logger = LoggerFactory.getLogger(TreeTagger.class);
+//	private static final Logger logger = LoggerFactory.getLogger(TreeTagger.class);
 	
 	private String tagging;
 

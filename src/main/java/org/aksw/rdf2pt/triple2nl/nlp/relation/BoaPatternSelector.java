@@ -20,21 +20,15 @@
 package org.aksw.rdf2pt.triple2nl.nlp.relation;
 
 import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
 
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServer;
@@ -244,28 +238,28 @@ public class BoaPatternSelector {
         }
     }
 
-    private static void createPropertyDistribution() throws IOException {
-        Path filePath = Paths.get("resources/qald2-dbpedia-train.xml");
-
-        String queryString = new String (Files.readAllBytes(filePath),Charset.forName("UTF-8"));
-
-        Map<String, Integer> distribution = new HashMap<>();
-        Matcher matcher = java.util.regex.Pattern.compile("db[op]:\\p{Lower}\\w+\\s").matcher(queryString);
-        while (matcher.find()) {
-
-            String property = matcher.group();
-            if (distribution.containsKey(property))
-                distribution.put(property, distribution.get(property) + 1);
-            else
-                distribution.put(property, 1);
-        }
-        List<String> result = new ArrayList<>();
-        for (Map.Entry<String, Integer> entry : distribution.entrySet()) {
-
-            result.add(entry.getValue() + ": " + entry.getKey());
-        }
-        Collections.sort(result);
-        for (String s : result)
-            System.out.println(s);
-    }
+//    private static void createPropertyDistribution() throws IOException {
+//        Path filePath = Paths.get("resources/qald2-dbpedia-train.xml");
+//
+//        String queryString = new String (Files.readAllBytes(filePath),Charset.forName("UTF-8"));
+//
+//        Map<String, Integer> distribution = new HashMap<>();
+//        Matcher matcher = java.util.regex.Pattern.compile("db[op]:\\p{Lower}\\w+\\s").matcher(queryString);
+//        while (matcher.find()) {
+//
+//            String property = matcher.group();
+//            if (distribution.containsKey(property))
+//                distribution.put(property, distribution.get(property) + 1);
+//            else
+//                distribution.put(property, 1);
+//        }
+//        List<String> result = new ArrayList<>();
+//        for (Map.Entry<String, Integer> entry : distribution.entrySet()) {
+//
+//            result.add(entry.getValue() + ": " + entry.getKey());
+//        }
+//        Collections.sort(result);
+//        for (String s : result)
+//            System.out.println(s);
+//    }
 }

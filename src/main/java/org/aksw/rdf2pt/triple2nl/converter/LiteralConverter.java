@@ -19,7 +19,12 @@
  */
 package org.aksw.rdf2pt.triple2nl.converter;
 
-import com.google.common.base.Joiner;
+import java.text.DateFormatSymbols;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Locale;
+import java.util.stream.Collectors;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jena.datatypes.DatatypeFormatException;
 import org.apache.jena.datatypes.RDFDatatype;
@@ -39,12 +44,7 @@ import org.semanticweb.owlapi.model.OWLLiteral;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.text.DateFormat;
-import java.text.DateFormatSymbols;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Locale;
-import java.util.stream.Collectors;
+import com.google.common.base.Joiner;
 
 /**
  * A converter for literals.
@@ -55,7 +55,7 @@ public class LiteralConverter {
     private static final Locale ENGLISH_LOCAL = Locale.UK;
     private static final Logger logger = LoggerFactory.getLogger(LiteralConverter.class);
     private IRIConverter iriConverter;
-    private DateFormat dateFormat = DateFormat.getDateInstance(DateFormat.LONG, ENGLISH_LOCAL);
+//    private DateFormat dateFormat = DateFormat.getDateInstance(DateFormat.LONG, ENGLISH_LOCAL);
     private boolean encapsulateStringLiterals = true;
 
     public LiteralConverter(IRIConverter iriConverter) {

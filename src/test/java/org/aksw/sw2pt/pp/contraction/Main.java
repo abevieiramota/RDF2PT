@@ -21,7 +21,7 @@ package org.aksw.sw2pt.pp.contraction;
 
 import org.junit.Test;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 
 // TODO: Repeat tests with plural when plural of NPs is done.
 /**
