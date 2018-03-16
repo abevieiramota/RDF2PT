@@ -20,6 +20,7 @@
 package org.aksw.rdf2pt.triple2nl.property;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
@@ -329,9 +330,8 @@ public class PropertyVerbalizerPortuguese {
 		
 		boolean has = false;
 		
-		 String csvFile = "/Users/diegomoussallem/Documents/workspace/RDF2PT/src/main/resources/patterns.csv";
+		ClassLoader classLoader = getClass().getClassLoader();
 
-	        BufferedReader br = null;
 	        String line = "";
 	        String cvsSplitBy = ",";
 //	        List<String> lines = new ArrayList<>();
@@ -339,16 +339,15 @@ public class PropertyVerbalizerPortuguese {
 //	        List<String> triplas = new ArrayList<>();
 //	        int i = 0;
 	        
-	        try {
-
-	            br = new BufferedReader(new FileReader(csvFile));
+	        // TODO: gambiarra -> por que não retorna o path correto, para folder com espaços?
+	        String path = classLoader.getResource("patterns.csv").getFile();
+	        path = path.replace("%20", " ");
+			File f = new File(path);
+	        try(BufferedReader br = new BufferedReader(new FileReader(f))){
 	            while ((line = br.readLine()) != null) {
-
 	                // use comma as separator
 	                String[] resource = line.split(cvsSplitBy);
-
 	        		uris.add(resource[0]);
-	        		
 	            }
 	            
 	            if(uris.contains(uri)){
@@ -358,14 +357,6 @@ public class PropertyVerbalizerPortuguese {
 	            e.printStackTrace();
 	        } catch (IOException e) {
 	            e.printStackTrace();
-	        } finally {
-	            if (br != null) {
-	                try {
-	                    br.close();
-	                } catch (IOException e) {
-	                    e.printStackTrace();
-	                }
-	            }
 	        }
 		
 		return has;

@@ -22,7 +22,7 @@ public class TreeTagger implements PartOfSpeechTagger {
 
 	public TreeTagger() throws IOException {
 //		System.setProperty("treetagger.home","/Users/diegomoussallem/Documents/workspace/sw2pt/src/main/resources/models/pt/TreeTagger/");
-		System.setProperty("treetagger.home","src/main/resources/models/pt/TreeTagger/");
+		System.setProperty("treetagger.home", "src/main/resources/models/pt/TreeTaggerWin/");
 		tt = new TreeTaggerWrapper<String>();
 		tt.setModel("portuguese-finegrained-utf8.par");
 	}

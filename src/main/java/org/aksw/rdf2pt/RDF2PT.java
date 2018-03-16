@@ -85,8 +85,8 @@ public class RDF2PT {
 //		
 //		System.out.println(triples(list));
 		
-		//System.out.println(resumo("http://pt.dbpedia.org/resource/Os_Lusíadas"));
-		//System.out.println(resumo("http://pt.dbpedia.org/resource/Marcos_Pontes"));
+		System.out.println(resumo("http://pt.dbpedia.org/resource/Os_Lusíadas"));
+		System.out.println(resumo("http://pt.dbpedia.org/resource/Marcos_Pontes"));
 		System.out.println(resumo("http://pt.dbpedia.org/resource/Albert_Einstein"));
 		
 		//System.out.println(triple("http://pt.dbpedia.org/resource/Albert_Einstein", "http://dbpedia.org/ontology/birthPlace", "http://pt.dbpedia.org/resource/Ulm"));
