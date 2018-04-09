@@ -5,11 +5,10 @@
  */
 package org.aksw.rdf2pt;
 
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
+import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
@@ -17,7 +16,7 @@ import org.apache.jena.query.QueryExecution;
 import org.apache.jena.query.QueryExecutionFactory;
 import org.apache.jena.query.QuerySolution;
 import org.apache.jena.query.ResultSet;
-import org.apache.jena.sparql.engine.http.QueryEngineHTTP;
+import org.apache.jena.rdf.model.Literal;
 
 /**
  *
@@ -25,172 +24,133 @@ import org.apache.jena.sparql.engine.http.QueryEngineHTTP;
  */
 public class Sparql {
 
-	public Set<Triple> getTriples(String resource) {
+	private static final String URI_RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
+	private static final long DEFAULT_TIMEOUT = 20000;
+	private static final String ONTOLOGY_SERVICE = "http://pt.dbpedia.org/sparql";
+	private static final int MAX_PREDICATES = 6;
+	private static final String SPARQL_PREDICATES = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> "
+			+ "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> "
+			+ "PREFIX dbo: <http://dbpedia.org/ontology/> "
+			+ "PREFIX owl: <http://www.w3.org/2002/07/owl#> "
 
-		String type = null;
+			+ "select distinct ?p (COUNT(?p) AS ?po) where {"
+			+ "?s rdf:type <%s>. "
+			+ "?s ?p ?o. "
+			+ "?p rdfs:label []. "
 
-		type = mostSpecificClass(resource);
-		// System.out.println("Type: " + type);
+			+ "FILTER ( strstarts(str(?p), 'http://dbpedia.org/ontology') ) "
+			+ "FILTER ( !strstarts(str(?p), 'http://dbpedia.org/ontology/abstract' ) ) "
+			+ "FILTER ( !strstarts(str(?o), 'http://commons.wikimedia.org/wiki/Special' ) ) "
+			+ "FILTER ( !strstarts(str(?o), 'http://pt.wikipedia.org/wiki/Special' ) ) "
+			+ "FILTER ( !strstarts(str(?p), 'http://www.w3.org/' ) ) "
+			+ "FILTER ( !strstarts(str(?p), 'http://xmlns.com' ) ) "
+			+ "FILTER ( !strstarts(str(?p), 'http://purl.org/dc/terms/subject' ) ) "
+			+ "FILTER ( !strstarts(str(?p), 'http://pt.dbpedia.org/property/wikiPageUsesTemplate' ) ) "
+			+ "FILTER ( !strstarts(str(?p), 'http://dbpedia.org/ontology/wikiPageExternalLink' ) ) "
+			+ "FILTER ( !strstarts(str(?p), 'http://dbpedia.org/ontology/wikiPageWikiLink' ) ) "
+			+ "} GROUP BY (?p) ORDER BY DESC (?po) LIMIT 50";
+
+	private static final String SPARQL_OBJECTS = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> "
+			+ "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> "
+			+ "PREFIX owl: <http://www.w3.org/2002/07/owl#> "
+			+ "SELECT DISTINCT ?o WHERE { <%s> <%s> ?o. }";
+
+	private static final String SPARQL_MOST_SPECIFIC_CLASS = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> "
+			+ "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> "
+			+ "PREFIX dbr: <http://dbpedia.org/resource/> "
+			+ "PREFIX dbo: <http://dbpedia.org/ontology/> "
+			+ "PREFIX owl: <http://www.w3.org/2002/07/owl#> "
+
+			+ "SELECT DISTINCT ?lcs WHERE { "
+			+ "?lcs ^rdf:type/rdfs:subClassOf* <%s>; "
+			+ "       a owl:Class ."
+			+ "  filter not exists { "
+			+ "    ?llcs ^(rdf:type/rdfs:subClassOf*) <%s> ; "
+			+ "          a owl:Class ; "
+			+ "          rdfs:subClassOf+ ?lcs . "
+			+ "  } "
+			+ "FILTER ( !strstarts(str(?lcs), 'http://www.wikidata.org/entity/' ) )}";
+
+	/**
+	 * retorna as top 7 triplas <s, p, o> com: 
+	 * 	s = resource 
+	 * 	p \in top 7 predicados(um deles vai ser o rdf:type) 
+	 * 		top 7 baseado em rank por quantidade de triplas, no store, com p, com o subject sendo entidade da classe mais específica 
+	 * 	caso p tenha múltiplos objetos, retorna o último(detalhe de implementação...)
+	 **/
+	public Set<Triple> getTriples(String resourceURI) {
+
 		Set<Triple> result = new HashSet<>();
-		List<String> predicates = new ArrayList<>();
 
-		String ontology_service = "http://pt.dbpedia.org/sparql";
-		// String ontology_service = "http://dbpedia.org/sparql";
+		String mostSpecificType = mostSpecificClass(resourceURI);
 
-		String sparqlQuery = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> "
-				+ "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
-				+ "PREFIX dbo: <http://dbpedia.org/ontology/>" + "PREFIX owl: <http://www.w3.org/2002/07/owl#> "
+		Node nodeResource = NodeFactory.createURI(resourceURI);
+		Node nodeTypePredicate = NodeFactory.createURI(URI_RDF_TYPE);
+		Node nodeMostSpecificClass = NodeFactory.createURI(mostSpecificType);
 
-				+ "select distinct ?p (COUNT(?p) AS ?po) where {"
+		result.add(Triple.create(nodeResource, nodeTypePredicate, nodeMostSpecificClass));
 
-				+ "?s rdf:type <" + type + ">." + "?s ?p ?o." + "?p rdfs:label []."
-				+ "FILTER ( strstarts(str(?p), 'http://dbpedia.org/ontology') )"
-				+ "FILTER ( !strstarts(str(?p), 'http://dbpedia.org/ontology/abstract' ) )"
-				+ "FILTER ( !strstarts(str(?o), 'http://commons.wikimedia.org/wiki/Special' ) )"
-				+ "FILTER ( !strstarts(str(?o), 'http://pt.wikipedia.org/wiki/Special' ) )"
-				// + "FILTER ( !strstarts(str(?p), 'http://dbpedia.org/ontology/subtitle' ) )"
-				// + "FILTER ( !strstarts(str(?p), 'http://dbpedia.org/ontology/thumbnail' ) )"
-				+ "FILTER ( !strstarts(str(?p), 'http://www.w3.org/' ) )"
-				+ "FILTER ( !strstarts(str(?p), 'http://xmlns.com' ) )"
-				+ "FILTER ( !strstarts(str(?p), 'http://purl.org/dc/terms/subject' ) )"
-				+ "FILTER ( !strstarts(str(?p), 'http://pt.dbpedia.org/property/wikiPageUsesTemplate' ) )"
-				+ "FILTER ( !strstarts(str(?p), 'http://dbpedia.org/ontology/wikiPageExternalLink' ) )"
-				+ "FILTER ( !strstarts(str(?p), 'http://dbpedia.org/ontology/wikiPageWikiLink' ) )"
-				// + "FILTER ( !strstarts(str(?p), 'http://pt.dbpedia.org/property/nome' ) )"
-				// + "FILTER ( !strstarts(str(?p), 'http://dbpedia.org/ontology/mission' ) )"
-				// + "FILTER ( !strstarts(str(?p), 'http://wikidata.dbpedia.org/property/' ) )"
-				// + "FILTER ( !strstarts(str(?p), 'http://pt.dbpedia.org/property/imagem' ) )"
-				//// + "FILTER ( !strstarts(str(?p), 'http://dbpedia.org/ontology/nationality' )
-				// )"
-				// + "FILTER ( !strstarts(str(?p), 'http://pt.dbpedia.org/property/tipo' ) )"
-				// + "FILTER ( !strstarts(str(?p), 'http://dbpedia.org/ontology/type' ) )"
-				// + "FILTER ( !strstarts(str(?p), 'http://pt.dbpedia.org/property/legenda' ) )"
-				// + "FILTER ( !strstarts(str(?p), 'http://pt.dbpedia.org/property/foto' ) )"
-				// + "FILTER ( !strstarts(str(?p), 'http://pt.dbpedia.org/property/imagesize' )
-				// )"
-				// + "FILTER ( !strstarts(str(?p), 'http://pt.dbpedia.org/property/premio' ) )"
-				// + "FILTER ( !strstarts(str(?p), 'http://pt.dbpedia.org/property/tamanho' ) )"
-				// + "FILTER ( !strstarts(str(?p), 'http://pt.dbpedia.org/property/patente' ) )"
-				// + "FILTER ( !strstarts(str(?p), 'http://dbpedia.org/ontology/occupation' ) )"
-				// + "FILTER ( !strstarts(str(?p), 'http://pt.dbpedia.org/property/topo' ) )"
-				// + "FILTER ( !strstarts(str(?p), 'http://pt.dbpedia.org/property/idioma' ) )"
-				// + "FILTER ( !strstarts(str(?p), 'http://dbpedia.org/ontology/picture' ) )"
-				// + "FILTER ( !strstarts(str(?p), 'http://pt.dbpedia.org/property/site' ) )"
-				// + "FILTER ( !strstarts(str(?p),
-				// 'http://pt.dbpedia.org/property/aposentadoria' ) )"
-				// + "FILTER ( !strstarts(str(?p), 'http://pt.dbpedia.org/property/website' ) )"
-				//// + "FILTER ( !strstarts(str(?p), 'http://dbpedia.org/ontology/location' ) )"
-				// + "FILTER ( !strstarts(str(?p), 'http://dbpedia.org/ontology/timeInSpace' )
-				// )"
-				//// + "FILTER ( !strstarts(str(?p), 'http://dbpedia.org/ontology/areaTotal' )
-				// )"
+		try (QueryExecution query = QueryExecutionFactory.sparqlService(ONTOLOGY_SERVICE,
+				String.format(SPARQL_PREDICATES, mostSpecificType))) {
+			query.setTimeout(DEFAULT_TIMEOUT);
 
-				+ "}" + "GROUP BY (?p)" + "ORDER BY DESC (?po)" + "LIMIT 50";
+			ResultSet results = query.execSelect();
 
-		QueryExecution query = QueryExecutionFactory.sparqlService(ontology_service, String.format(sparqlQuery));
-		((QueryEngineHTTP) query).addParam("timeout", "20000");
+			int nPredicatesProcessed = 0;
+			// TODO: não tem como pedir logo todas as triplas dos predicados?
+			while (results.hasNext() && nPredicatesProcessed++ <= MAX_PREDICATES) {
+				String predicate = results.next().getResource("p").toString();
 
-		ResultSet results = null;
-		try {
-			results = query.execSelect();
-		} catch (Exception e) {
-			e.printStackTrace();
-			return null;
-		}
-
-		String pred = null;
-		while (results.hasNext()) {
-			QuerySolution qs = results.next();
-			pred = qs.getResource("p").toString();
-			predicates.add(pred);
-			// System.out.println(pred.toString());
-		}
-
-		result.add(Triple.create(NodeFactory.createURI(resource),
-				NodeFactory.createURI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"), NodeFactory.createURI(type)));
-
-		Triple t;
-		if (predicates.size() >= 6) {
-
-			for (int i = 0; i < 6; i++) {
-				// System.out.println(predicates.get(i));
-				t = getObjects(resource, predicates.get(i));
-				if (t != null) {
-					result.add(t);
+				Triple predicateObject = getObject(resourceURI, predicate);
+				if (predicateObject != null) {
+					result.add(predicateObject);
 				}
 			}
-		} else {
 
-			for (int i = 0; i < predicates.size(); i++) {
-				// System.out.println(predicates.get(i));
-				t = getObjects(resource, predicates.get(i));
-				if (t != null) {
-					result.add(t);
-				}
-			}
+			return result;
 		}
-
-		return result;
 	}
 
-	public Triple getObjects(String resource, String predicate) {
+	public Triple getObject(String s, String p) {
 
-		// String ontology_service = "http://dbpedia.org/sparql";
-		String ontology_service = "http://pt.dbpedia.org/sparql";
+		String sparqlObjects = String.format(SPARQL_OBJECTS, s, p);
+		try (QueryExecution query = QueryExecutionFactory.sparqlService(ONTOLOGY_SERVICE, sparqlObjects)) {
 
-		Triple triple = null;
-		String sparqlQuery = " PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"
-				+ " PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
-				+ " PREFIX owl: <http://www.w3.org/2002/07/owl#>" + "SELECT DISTINCT ?o WHERE { " + "<" + resource
-				+ "> <" + predicate + "> ?o."
-				// + "?o rdfs:label ?label."
-				// + "FILTER (lang(?o) = 'pt')"
-				// + "FILTER (lang(?label) = 'pt') "
-				+ "} "
-		// + "LIMIT 1"
-		;
+			ResultSet results = query.execSelect();
 
-		QueryExecution query = QueryExecutionFactory.sparqlService(ontology_service, String.format(sparqlQuery));
+			Node sNode = NodeFactory.createURI(s);
+			Node pNode = NodeFactory.createURI(p);
+			Node oNode;
 
-		ResultSet results = null;
-		try {
-			results = query.execSelect();
-		} catch (Exception e) {
-			return null;
-		}
+			Triple triple = null;
+			// FIXME: retorna o último objeto retornado na consulta, tal que
+			// oNode <> null?
+			while (results.hasNext()) {
+				QuerySolution qs = results.next();
 
-		Node subject = NodeFactory.createURI(resource);
-		Node property = NodeFactory.createURI(predicate);
-		Node object;
+				if (qs.get("o").isLiteral()) {
+					Literal literal = qs.getLiteral("o");
 
-		while (results.hasNext()) {
-			QuerySolution qs = results.next();
-			if (qs.get("o").isLiteral()) {
-				object = NodeFactory.createLiteral(qs.getLiteral("o").getLexicalForm(),
-						qs.getLiteral("o").getLanguage(), qs.getLiteral("o").getDatatype());
-				// System.out.println(object.toString());
-			} else {
-				object = NodeFactory.createURI(qs.getResource("o").toString());
-				// System.out.println(object.toString());
+					String lexicalForm = literal.getLexicalForm();
+					String language = literal.getLanguage();
+					RDFDatatype datatype = literal.getDatatype();
+
+					oNode = NodeFactory.createLiteral(lexicalForm, language, datatype);
+				} else {
+					oNode = NodeFactory.createURI(qs.getResource("o").toString());
+				}
+
+				if (oNode != null) {
+					triple = Triple.create(sNode, pNode, oNode);
+				}
 			}
 
-			// System.out.println(resource + predicate);
-			if (object != null) {
-				triple = Triple.create(subject, property, object);
-				// System.out.println(triple.toString());
-			}
+			return triple;
 		}
-
-		return triple;
 
 	}
 
 	public String mostGenericClass(String uri) {
-		// First query takes the most specific class from a given resource.
-
-		String ontology_service = "http://pt.dbpedia.org/sparql";
-		// String ontology_service = "http://dbpedia.org/sparql";
-
 		String sparqlQuery = " PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"
 				+ " PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
 				+ " PREFIX dbr: <http://dbpedia.org/resource/>" + " PREFIX dbo: <http://dbpedia.org/ontology/>"
@@ -199,7 +159,7 @@ public class Sparql {
 				+ "?genericType rdfs:subClassOf owl:Thing ;"
 				+ "FILTER ( strstarts(str(?type), 'http://dbpedia.org/ontology' ) )}";
 
-		QueryExecution query = QueryExecutionFactory.sparqlService(ontology_service, String.format(sparqlQuery));
+		QueryExecution query = QueryExecutionFactory.sparqlService(ONTOLOGY_SERVICE, String.format(sparqlQuery));
 
 		ResultSet results = null;
 		try {
@@ -218,49 +178,25 @@ public class Sparql {
 	}
 
 	public String mostSpecificClass(String uri) {
-		// First query takes the most specific class from a given resource.
-		String ontology_service = "http://pt.dbpedia.org/sparql";
-		// String ontology_service = "http://dbpedia.org/sparql";
 
-		String sparqlQuery = " PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"
-				+ " PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
-				+ " PREFIX dbr: <http://dbpedia.org/resource/>" + " PREFIX dbo: <http://dbpedia.org/ontology/>"
-				+ " PREFIX owl: <http://www.w3.org/2002/07/owl#>" + "SELECT DISTINCT ?lcs WHERE {"
-				+ "?lcs ^rdf:type/rdfs:subClassOf* <" + uri + ">;" + "       a owl:Class ." + "  filter not exists {"
-				+ "    ?llcs ^(rdf:type/rdfs:subClassOf*) <" + uri + "> ;" + "          a owl:Class ;"
-				+ "          rdfs:subClassOf+ ?lcs ." + "  }"
-				+ "FILTER ( !strstarts(str(?lcs), 'http://www.wikidata.org/entity/' ) )}";
+		String sparqlMostSpecificClass = String.format(SPARQL_MOST_SPECIFIC_CLASS, uri, uri);
+		try (QueryExecution query = QueryExecutionFactory.sparqlService(ONTOLOGY_SERVICE, sparqlMostSpecificClass)) {
 
-		QueryExecution query = QueryExecutionFactory.sparqlService(ontology_service, String.format(sparqlQuery));
-
-		ResultSet results = null;
-		try {
-			results = query.execSelect();
-		} catch (Exception e) {
-			return "";
-		}
-
-		String property = null;
-		while (results.hasNext()) {
+			ResultSet results = query.execSelect();
 			QuerySolution qs = results.next();
-			property = qs.getResource("lcs").toString();
 
+			return qs.getResource("lcs").toString();
 		}
-		// System.out.println(property);
-		return property;
 	}
 
 	public boolean hasDeathPlace(String uri) {
-		String ontology_service = "http://pt.dbpedia.org/sparql";
-		// String ontology_service = "http://dbpedia.org/sparql";
-
 		String sparqlQuery = " PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"
 				+ " PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
 				+ " PREFIX dbr: <http://dbpedia.org/resource/>" + " PREFIX dbo: <http://dbpedia.org/ontology/>"
 				+ " PREFIX owl: <http://www.w3.org/2002/07/owl#>" + "SELECT DISTINCT ?o WHERE {<" + uri + "> ?p ?o."
 				+ "FILTER (?p = <http://dbpedia.org/ontology/deathPlace> || ?p = <http://pt.dbpedia.org/property/localMorte> )}";
 
-		QueryExecution query = QueryExecutionFactory.sparqlService(ontology_service, String.format(sparqlQuery));
+		QueryExecution query = QueryExecutionFactory.sparqlService(ONTOLOGY_SERVICE, String.format(sparqlQuery));
 
 		ResultSet results = null;
 		try {

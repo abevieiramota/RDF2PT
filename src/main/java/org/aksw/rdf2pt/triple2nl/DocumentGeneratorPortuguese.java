@@ -52,9 +52,8 @@ import org.apache.jena.rdf.model.StmtIterator;
 import org.apache.jena.vocabulary.RDF;
 import org.dllearner.kb.sparql.SparqlEndpoint;
 
-import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 
 import simplenlg.features.Feature;
 import simplenlg.features.InternalFeature;
@@ -80,6 +79,7 @@ public class DocumentGeneratorPortuguese {
 	private IRIConverter uriConverter;
 
 	private boolean useAsWellAsCoordination = true;
+	private static final boolean GENERATE_SUMMARY = true;
 
 	public DocumentGeneratorPortuguese(SparqlEndpoint endpoint, String cacheDirectory) {
 		this(endpoint, cacheDirectory, new XMLLexicon());
@@ -112,37 +112,24 @@ public class DocumentGeneratorPortuguese {
 	}
 
 	public String generateDocument(Set<Triple> documentTriples) throws IOException {
-		
-//		DefaultDirectedGraph<Node, DefaultEdge> graph = asGraph(documentTriples);
-
-		// divide the document into paragraphs for each connected component in
-		// the graph
-//		ConnectivityInspector<Node, DefaultEdge> connectivityInspector = new ConnectivityInspector<>(graph);
-//		List<Set<Node>> connectedNodes = connectivityInspector.connectedSets();
-
-		// for (Set<Node> nodes : connectedNodes) {
-		// System.out.println(nodes);
-		// }
-
-		// group triples by subject
-		Map<Node, Collection<Triple>> subject2Triples = groupBySubject(documentTriples);
-
+		Map<Node, Collection<Triple>> subject2Triples = Multimaps.index(documentTriples, t -> t.getSubject()).asMap();
 		// do some sorting
 		subject2Triples = sort(documentTriples, subject2Triples);
-		//System.out.println(documentTriples.size());
+
 		Sparql sparql = new Sparql();
-		boolean dead = false;
-		boolean summary = true;
+		
 		List<DocumentElement> sentences = new ArrayList<>();
+		
 		for (Entry<Node, Collection<Triple>> entry : subject2Triples.entrySet()) {
 			Node subject = entry.getKey();
-			dead = sparql.hasDeathPlace(subject.toString());
+			boolean isPersonDead = sparql.hasDeathPlace(subject.toString());
 			String genericType = sparql.mostGenericClass(subject.toString());
 			String specificType = sparql.mostSpecificClass(subject.toString());
 			//System.out.println("Subject: " + subject.toString() + "  Generic type: " + genericType + "  Dead? " + dead);
 
 			genderDetector = new DictionaryBasedGenderDetector();
-			uriConverter = new DefaultIRIConverterPortuguese(SparqlEndpoint.create("http://pt.dbpedia.org/sparql", "http://dbpedia.org"));
+			uriConverter = new DefaultIRIConverterPortuguese(
+					SparqlEndpoint.create("http://pt.dbpedia.org/sparql", "http://dbpedia.org"));
 			Gender gender = genderDetector.getGender(uriConverter.convert(subject.toString()));
 
 			Collection<Triple> triples = entry.getValue();
@@ -150,7 +137,7 @@ public class DocumentGeneratorPortuguese {
 			// combine with conjunction
 			CoordinatedPhraseElement conjunction = nlgFactory.createCoordinatedPhrase();
 			CoordinatedPhraseElement conjunction2 = nlgFactory.createCoordinatedPhrase();
-			
+
 			// get the type triples first
 			Set<Triple> typeTriples = new HashSet<>();
 			Set<Triple> otherTriples = new HashSet<>();
@@ -164,7 +151,7 @@ public class DocumentGeneratorPortuguese {
 			}
 
 			// convert the type triples
-			List<SPhraseSpec> typePhrases = tripleConverter.convertToPhrases(typeTriples, dead, summary);
+			List<SPhraseSpec> typePhrases = tripleConverter.convertToPhrases(typeTriples, isPersonDead, GENERATE_SUMMARY);
 
 			// if there are more than one types, we combine them in a single
 			// clause
@@ -243,9 +230,8 @@ public class DocumentGeneratorPortuguese {
 				} else {
 					placeHolderToken = (typeTriples.isEmpty() || otherTriples.size() == 1) ? "dele" : "dele";
 				}
-			
-			}
-			else {
+
+			} else {
 				placeHolderToken = (typeTriples.isEmpty() || otherTriples.size() == 1) ? "dele" : "dele";
 			}
 			Node placeHolder = NodeFactory.createURI("http://sparql2nl.aksw.org/placeHolder/" + placeHolderToken);
@@ -264,30 +250,30 @@ public class DocumentGeneratorPortuguese {
 				placeHolderTriples.add(newTriple);
 			}
 
-			Collection<SPhraseSpec> otherPhrases = tripleConverter.convertToPhrases(placeHolderTriples, dead, summary);
+			Collection<SPhraseSpec> otherPhrases = tripleConverter.convertToPhrases(placeHolderTriples, isPersonDead, GENERATE_SUMMARY);
 
 			int count = 0;
 			boolean nextSentence = false;
 			for (SPhraseSpec phrase : otherPhrases) {
-				if (count < 2 ){
-				conjunction.addCoordinate(phrase);
-				}
-				else if(count >= 2 ) {
-					if(count == 2) {
-						conjunction2.addPreModifier("Além disso,");}
-				conjunction2.addCoordinate(phrase);
-				nextSentence = true;
+				if (count < 2) {
+					conjunction.addCoordinate(phrase);
+				} else if (count >= 2) {
+					if (count == 2) {
+						conjunction2.addPreModifier("Além disso,");
+					}
+					conjunction2.addCoordinate(phrase);
+					nextSentence = true;
 				}
 				count++;
 			}
-			
+
 			DocumentElement sentence = nlgFactory.createSentence(conjunction);
 			sentences.add(sentence);
-			if(nextSentence == true){
-			DocumentElement sentence2 = nlgFactory.createSentence(conjunction2);
-			sentences.add(sentence2);
+			if (nextSentence == true) {
+				DocumentElement sentence2 = nlgFactory.createSentence(conjunction2);
+				sentences.add(sentence2);
 			}
-			
+
 		}
 		//DocumentElement par1 = nlgFactory.createParagraph(Arrays.asList(s1, s2, s3)); [1]
 		DocumentElement paragraph = nlgFactory.createParagraph(sentences);
@@ -301,68 +287,39 @@ public class DocumentGeneratorPortuguese {
 	/**
 	 * @param documentTriples
 	 *            the set of triples
-	 * @param subject2Triples
+	 * @param mapSubjectsToTriples
 	 *            a map that contains for each node the triples in which it
 	 *            occurs as subject
 	 */
+	// prefer subjects that do not occur in object position first
 	private Map<Node, Collection<Triple>> sort(Set<Triple> documentTriples,
-			Map<Node, Collection<Triple>> subject2Triples) {
-		Map<Node, Collection<Triple>> sortedTriples = new LinkedHashMap<>();
-		// we can order by occurrence, i.e. which subjects do not occur in
-		// object position
-		// for each subject we check how often they occur in subject/object
-		// position
-		Multimap<Node, Node> outgoing = HashMultimap.create();
-		Multimap<Node, Node> incoming = HashMultimap.create();
-		for (Node subject : subject2Triples.keySet()) {
-			for (Triple triple : documentTriples) {
-				if (triple.subjectMatches(subject)) {
-					outgoing.put(subject, triple.getObject());
-				} else if (triple.objectMatches(subject)) {
-					incoming.put(subject, triple.getSubject());
-				}
+			Map<Node, Collection<Triple>> mapSubjectsToTriples) {
+		Set<Node> subjectsThatAppearAsObject = new HashSet<>();
+
+		for (Triple t : documentTriples) {
+			if (mapSubjectsToTriples.containsKey(t.getObject())) {
+				subjectsThatAppearAsObject.add(t.getObject());
 			}
 		}
-		// prefer subjects that do not occur in object position first
-		for (Iterator<Entry<Node, Collection<Triple>>> iterator = subject2Triples.entrySet().iterator(); iterator
-				.hasNext();) {
-			Entry<Node, Collection<Triple>> entry = iterator.next();
+
+		Map<Node, Collection<Triple>> sortedTriples = new LinkedHashMap<>();
+
+		Entry<Node, Collection<Triple>> entry = null;
+		for (Iterator<Entry<Node, Collection<Triple>>> iterator = mapSubjectsToTriples.entrySet().iterator(); iterator
+				.hasNext(); entry = iterator.next()) {
 			Node subject = entry.getKey();
-			if (!incoming.containsKey(subject)) {
-				sortedTriples.put(subject, new HashSet<>(entry.getValue()));
+			
+			if (!subjectsThatAppearAsObject.contains(subject)) {
+				sortedTriples.put(subject, entry.getValue());
+			
 				iterator.remove();
 			}
 		}
 		// add the rest
-		sortedTriples.putAll(subject2Triples);
-
-		// TODO order by triple count
-
-		// TODO order by prominence
+		sortedTriples.putAll(mapSubjectsToTriples);
 
 		return sortedTriples;
 	}
-
-	private Map<Node, Collection<Triple>> groupBySubject(Set<Triple> triples) {
-		Multimap<Node, Triple> subject2Triples = HashMultimap.create();
-		for (Triple triple : triples) {
-			subject2Triples.put(triple.getSubject(), triple);
-		}
-		return subject2Triples.asMap();
-	}
-
-//	private DefaultDirectedGraph<Node, DefaultEdge> asGraph(Set<Triple> triples) {
-//		DefaultDirectedGraph<Node, DefaultEdge> graph = new DefaultDirectedGraph<>(DefaultEdge.class);
-//		for (Triple triple : triples) {
-//			// we have to omit type triples to get connected subgraphs later on
-//			if (!triple.predicateMatches(RDF.type.asNode())) {
-//				graph.addVertex(triple.getSubject());
-//				graph.addVertex(triple.getObject());
-//				graph.addEdge(triple.getSubject(), triple.getObject());
-//			}
-//		}
-//		return graph;
-//	}
 
 	public static void main(String[] args) throws Exception {
 		String triples = "@prefix dbr: <http://dbpedia.org/resource/>." + "@prefix dbo: <http://dbpedia.org/ontology/>."
