@@ -24,6 +24,7 @@ package org.aksw.rdf2pt.triple2nl;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -52,8 +53,10 @@ import org.apache.jena.rdf.model.StmtIterator;
 import org.apache.jena.vocabulary.RDF;
 import org.dllearner.kb.sparql.SparqlEndpoint;
 
+import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimaps;
+import com.google.common.collect.Sets;
 
 import simplenlg.features.Feature;
 import simplenlg.features.InternalFeature;
@@ -75,25 +78,29 @@ public class DocumentGeneratorPortuguese {
 	private TripleConverterPortuguese tripleConverter;
 	private NLGFactory nlgFactory;
 	private Realiser realiser;
-	private GenderDetector genderDetector;
+	private GenderDetector genderDetector = new DictionaryBasedGenderDetector();
 	private IRIConverter uriConverter;
 
 	private boolean useAsWellAsCoordination = true;
 	private static final boolean GENERATE_SUMMARY = true;
 
-	public DocumentGeneratorPortuguese(SparqlEndpoint endpoint, String cacheDirectory) {
+	public DocumentGeneratorPortuguese(SparqlEndpoint endpoint, String cacheDirectory) throws MalformedURLException {
 		this(endpoint, cacheDirectory, new XMLLexicon());
 	}
 
-	public DocumentGeneratorPortuguese(SparqlEndpoint endpoint, String cacheDirectory, Lexicon lexicon) {
+	public DocumentGeneratorPortuguese(SparqlEndpoint endpoint, String cacheDirectory, Lexicon lexicon)
+			throws MalformedURLException {
 		this(new QueryExecutionFactoryHttp(endpoint.getURL().toString(), endpoint.getDefaultGraphURIs()),
 				cacheDirectory, lexicon);
 	}
 
-	public DocumentGeneratorPortuguese(QueryExecutionFactory qef, String cacheDirectory, Lexicon lexicon) {
-		tripleConverter = new TripleConverterPortuguese(qef, null, null, cacheDirectory, null, lexicon);
-		nlgFactory = new NLGFactory(lexicon);
-		realiser = new Realiser();
+	public DocumentGeneratorPortuguese(QueryExecutionFactory qef, String cacheDirectory, Lexicon lexicon)
+			throws MalformedURLException {
+		this.tripleConverter = new TripleConverterPortuguese(qef, null, null, cacheDirectory, null, lexicon);
+		this.nlgFactory = new NLGFactory(lexicon);
+		this.realiser = new Realiser();
+		this.uriConverter = new DefaultIRIConverterPortuguese(
+				SparqlEndpoint.create("http://pt.dbpedia.org/sparql", "http://dbpedia.org"));
 	}
 
 	public String generateDocument(Model model) throws IOException {
@@ -117,143 +124,41 @@ public class DocumentGeneratorPortuguese {
 		subject2Triples = sort(documentTriples, subject2Triples);
 
 		Sparql sparql = new Sparql();
-		
+
 		List<DocumentElement> sentences = new ArrayList<>();
-		
+
 		for (Entry<Node, Collection<Triple>> entry : subject2Triples.entrySet()) {
-			Node subject = entry.getKey();
-			boolean isPersonDead = sparql.hasDeathPlace(subject.toString());
-			String genericType = sparql.mostGenericClass(subject.toString());
-			String specificType = sparql.mostSpecificClass(subject.toString());
-			//System.out.println("Subject: " + subject.toString() + "  Generic type: " + genericType + "  Dead? " + dead);
+			Node s = entry.getKey();
 
-			genderDetector = new DictionaryBasedGenderDetector();
-			uriConverter = new DefaultIRIConverterPortuguese(
-					SparqlEndpoint.create("http://pt.dbpedia.org/sparql", "http://dbpedia.org"));
-			Gender gender = genderDetector.getGender(uriConverter.convert(subject.toString()));
+			boolean isPersonDead = sparql.hasDeathPlace(s.toString());
 
-			Collection<Triple> triples = entry.getValue();
+			String mostGenericType = sparql.mostGenericClass(s.toString());
+			String mostSpecificType = sparql.mostSpecificClass(s.toString());
 
-			// combine with conjunction
-			CoordinatedPhraseElement conjunction = nlgFactory.createCoordinatedPhrase();
-			CoordinatedPhraseElement conjunction2 = nlgFactory.createCoordinatedPhrase();
+			// a partir do label(orelse) tenta determinar o gênero
+			Gender gender = this.genderDetector.getGender(this.uriConverter.convert(s.toString()));
 
-			// get the type triples first
-			Set<Triple> typeTriples = new HashSet<>();
-			Set<Triple> otherTriples = new HashSet<>();
+			Set<Triple> typeTriples = Sets.newHashSet(Collections2.filter(entry.getValue(),
+					t -> t.predicateMatches(RDF.type.asNode())));
+			Set<Triple> otherTriples = Sets.newHashSet(Collections2.filter(entry.getValue(),
+					t -> !t.predicateMatches(RDF.type.asNode())));
 
-			for (Triple triple : triples) {
-				if (triple.predicateMatches(RDF.type.asNode())) {
-					typeTriples.add(triple);
-				} else {
-					otherTriples.add(triple);
-				}
+			CoordinatedPhraseElement conjunction = this.nlgFactory.createCoordinatedPhrase();
+
+			List<SPhraseSpec> typePhrases = generateTypePhrases(isPersonDead, mostSpecificType, gender, typeTriples);
+
+			for (SPhraseSpec typePhrase : typePhrases) {
+				conjunction.addCoordinate(typePhrase);
 			}
 
-			// convert the type triples
-			List<SPhraseSpec> typePhrases = tripleConverter.convertToPhrases(typeTriples, isPersonDead, GENERATE_SUMMARY);
-
-			// if there are more than one types, we combine them in a single
-			// clause
-			if (typePhrases.size() > 1) {
-				// combine all objects in a coordinated phrase
-				CoordinatedPhraseElement combinedObject = nlgFactory.createCoordinatedPhrase();
-
-				// here will be necessary to treat the gramatical gender of
-				// subjects
-				// the last 2 phrases are combined via 'assim como'
-				if (useAsWellAsCoordination) {
-					SPhraseSpec phrase1 = typePhrases.remove(typePhrases.size() - 1);
-					SPhraseSpec phrase2 = typePhrases.get(typePhrases.size() - 1);
-					// combine all objects in a coordinated phrase
-					CoordinatedPhraseElement combinedLastTwoObjects = nlgFactory
-							.createCoordinatedPhrase(phrase1.getObject(), phrase2.getObject());
-					combinedLastTwoObjects.setConjunction("assim como");
-					combinedLastTwoObjects.setFeature(Feature.RAISE_SPECIFIER, false);
-					if (gender.name().equals("FEMALE")) {
-						combinedLastTwoObjects.setFeature(InternalFeature.SPECIFIER, "uma"); // here
-					} else {
-						if (specificType.equals("http://dbpedia.org/ontology/SoccerClub")) {
-							combinedLastTwoObjects.setFeature(InternalFeature.SPECIFIER, "um"); // here
-						}
-					}
-					phrase2.setObject(combinedLastTwoObjects);
-				}
-
-				Iterator<SPhraseSpec> iterator = typePhrases.iterator();
-				// pick first phrase as representative
-				SPhraseSpec representative = iterator.next();
-				combinedObject.addCoordinate(representative.getObject());
-
-				while (iterator.hasNext()) {
-					SPhraseSpec phrase = iterator.next();
-					NLGElement object = phrase.getObject();
-					combinedObject.addCoordinate(object);
-				}
-
-				combinedObject.setFeature(Feature.RAISE_SPECIFIER, true);
-
-				// set the coordinated phrase as the object
-				representative.setObject(combinedObject);
-				// return a single phrase
-				typePhrases = Lists.newArrayList(representative);
-			}
-			for (SPhraseSpec phrase : typePhrases) {
-				conjunction.addCoordinate(phrase);
-			}
-
-			// convert the other triples, but use place holders for the subject
-			String placeHolderToken;
-
-			if (genericType.equals("http://dbpedia.org/ontology/Person")) {
-				if (gender.name().equals("FEMALE")) {
-					placeHolderToken = (typeTriples.isEmpty() || otherTriples.size() == 1) ? "dela" : "dela";
-				} else {
-					placeHolderToken = (typeTriples.isEmpty() || otherTriples.size() == 1) ? "dele" : "dele";
-				}
-			} else if (genericType.equals("http://dbpedia.org/ontology/Organisation")) {
-				if (specificType.equals("http://dbpedia.org/ontology/SoccerClub")) {
-					placeHolderToken = (typeTriples.isEmpty() || otherTriples.size() == 1) ? "dele" : "dele";
-				} else {
-					placeHolderToken = (typeTriples.isEmpty() || otherTriples.size() == 1) ? "dela" : "dela";
-				}
-
-			} else if (genericType.equals("http://dbpedia.org/ontology/PopulatedPlace")) {
-				if (specificType.equals("http://dbpedia.org/ontology/City")) {
-					placeHolderToken = (typeTriples.isEmpty() || otherTriples.size() == 1) ? "dela" : "dela";
-				} else {
-					placeHolderToken = (typeTriples.isEmpty() || otherTriples.size() == 1) ? "dele" : "dele";
-				}
-			} else if (genericType.equals("http://dbpedia.org/ontology/ArchitecturalStructure")) {
-				if (specificType.equals("http://dbpedia.org/ontology/Church")) {
-					placeHolderToken = (typeTriples.isEmpty() || otherTriples.size() == 1) ? "dela" : "dela";
-				} else {
-					placeHolderToken = (typeTriples.isEmpty() || otherTriples.size() == 1) ? "dele" : "dele";
-				}
-
-			} else {
-				placeHolderToken = (typeTriples.isEmpty() || otherTriples.size() == 1) ? "dele" : "dele";
-			}
-			Node placeHolder = NodeFactory.createURI("http://sparql2nl.aksw.org/placeHolder/" + placeHolderToken);
-
-			// Node placeHolder = subject;
-			Collection<Triple> placeHolderTriples = new ArrayList<>(otherTriples.size());
-			Iterator<Triple> iterator = otherTriples.iterator();
-			// we have to keep one triple with subject if we have no type
-			// triples
-			if (typeTriples.isEmpty() && iterator.hasNext()) {
-				placeHolderTriples.add(iterator.next());
-			}
-			while (iterator.hasNext()) {
-				Triple triple = iterator.next();
-				Triple newTriple = Triple.create(placeHolder, triple.getPredicate(), triple.getObject());
-				placeHolderTriples.add(newTriple);
-			}
-
-			Collection<SPhraseSpec> otherPhrases = tripleConverter.convertToPhrases(placeHolderTriples, isPersonDead, GENERATE_SUMMARY);
+			Collection<SPhraseSpec> otherPhrases = generateOtherPhrases(isPersonDead, mostGenericType, mostSpecificType,
+					gender,
+					typeTriples, otherTriples);
 
 			int count = 0;
-			boolean nextSentence = false;
+			boolean isThereSecondSentence = false;
+
+			CoordinatedPhraseElement conjunction2 = this.nlgFactory.createCoordinatedPhrase();
 			for (SPhraseSpec phrase : otherPhrases) {
 				if (count < 2) {
 					conjunction.addCoordinate(phrase);
@@ -262,26 +167,151 @@ public class DocumentGeneratorPortuguese {
 						conjunction2.addPreModifier("Além disso,");
 					}
 					conjunction2.addCoordinate(phrase);
-					nextSentence = true;
+					isThereSecondSentence = true;
 				}
 				count++;
 			}
 
-			DocumentElement sentence = nlgFactory.createSentence(conjunction);
+			DocumentElement sentence = this.nlgFactory.createSentence(conjunction);
 			sentences.add(sentence);
-			if (nextSentence == true) {
-				DocumentElement sentence2 = nlgFactory.createSentence(conjunction2);
+			
+			if (isThereSecondSentence) {
+				DocumentElement sentence2 = this.nlgFactory.createSentence(conjunction2);
 				sentences.add(sentence2);
 			}
 
 		}
-		//DocumentElement par1 = nlgFactory.createParagraph(Arrays.asList(s1, s2, s3)); [1]
-		DocumentElement paragraph = nlgFactory.createParagraph(sentences);
+		
+		DocumentElement paragraph = this.nlgFactory.createParagraph(sentences);
 
-		String paragraphText = realiser.realise(paragraph).getRealisation();
+		String paragraphText = this.realiser.realise(paragraph).getRealisation();
+		
 		paragraphText = paragraphText.replaceAll("an ", "a ");
 		paragraphText = paragraphText.replaceAll(", e ", " e ");
+		
 		return paragraphText;
+	}
+
+	private Collection<SPhraseSpec> generateOtherPhrases(boolean isPersonDead, String mostGenericType,
+			String mostSpecificType,
+			Gender gender, Set<Triple> typeTriples, Set<Triple> otherTriples) throws IOException {
+		// Referring Expression Generation
+		// convert the other triples, but use place holders for the subject
+		String placeHolderToken = determinePlaceHolder(mostGenericType, mostSpecificType, gender);
+		Node placeHolder = NodeFactory.createURI("http://sparql2nl.aksw.org/placeHolder/" + placeHolderToken);
+
+		// Node placeHolder = subject;
+		Collection<Triple> otherTriplesWPlaceHolder = new ArrayList<>(otherTriples.size());
+		Iterator<Triple> iterator = otherTriples.iterator();
+		// se n tem tripla com type, adiciona uma tripla à lista, sem substituir o subject pelo placeholder
+		if (typeTriples.isEmpty() && iterator.hasNext()) {
+			otherTriplesWPlaceHolder.add(iterator.next());
+		}
+
+		while (iterator.hasNext()) {
+			Triple triple = iterator.next();
+			Triple wPlaceHolderTriple = Triple.create(placeHolder, triple.getPredicate(), triple.getObject());
+
+			otherTriplesWPlaceHolder.add(wPlaceHolderTriple);
+		}
+
+		Collection<SPhraseSpec> otherPhrases = tripleConverter.convertToPhrases(otherTriplesWPlaceHolder, isPersonDead,
+				GENERATE_SUMMARY);
+		return otherPhrases;
+	}
+
+	private List<SPhraseSpec> generateTypePhrases(boolean isPersonDead, String mostSpecificType, Gender gender,
+			Set<Triple> typeTriples) throws IOException {
+		// convert the type triples
+		List<SPhraseSpec> typePhrases = this.tripleConverter.convertToPhrases(typeTriples, isPersonDead,
+				GENERATE_SUMMARY);
+
+		// if there are more than one types, we combine them in a single clause
+		if (typePhrases.size() > 1) {
+			typePhrases = combineTypePhrases(mostSpecificType, gender, typePhrases);
+		}
+		return typePhrases;
+	}
+
+	private String determinePlaceHolder(String mostGenericType, String mostSpecificType, Gender gender) {
+		String placeHolderToken;
+
+		if (mostGenericType.equals("http://dbpedia.org/ontology/Person")) {
+			if (gender.name().equals("FEMALE")) {
+				placeHolderToken = "dela";
+			} else {
+				placeHolderToken = "dele";
+			}
+		} else if (mostGenericType.equals("http://dbpedia.org/ontology/Organisation")) {
+			if (mostSpecificType.equals("http://dbpedia.org/ontology/SoccerClub")) {
+				placeHolderToken = "dele";
+			} else {
+				placeHolderToken = "dela";
+			}
+
+		} else if (mostGenericType.equals("http://dbpedia.org/ontology/PopulatedPlace")) {
+			if (mostSpecificType.equals("http://dbpedia.org/ontology/City")) {
+				placeHolderToken = "dela";
+			} else {
+				placeHolderToken = "dele";
+			}
+		} else if (mostGenericType.equals("http://dbpedia.org/ontology/ArchitecturalStructure")) {
+			if (mostSpecificType.equals("http://dbpedia.org/ontology/Church")) {
+				placeHolderToken = "dela";
+			} else {
+				placeHolderToken = "dele";
+			}
+
+		} else {
+			placeHolderToken = "dele";
+		}
+		return placeHolderToken;
+	}
+
+	private List<SPhraseSpec> combineTypePhrases(String mostSpecificType, Gender gender,
+			List<SPhraseSpec> typePhrases) {
+		// combine all objects in a coordinated phrase
+		CoordinatedPhraseElement combinedObject = nlgFactory.createCoordinatedPhrase();
+
+		// here will be necessary to treat the gramatical gender of
+		// subjects
+		// the last 2 phrases are combined via 'assim como'
+		if (useAsWellAsCoordination) {
+			SPhraseSpec phrase1 = typePhrases.remove(typePhrases.size() - 1);
+			SPhraseSpec phrase2 = typePhrases.get(typePhrases.size() - 1);
+			// combine all objects in a coordinated phrase
+			CoordinatedPhraseElement combinedLastTwoObjects = nlgFactory
+					.createCoordinatedPhrase(phrase1.getObject(), phrase2.getObject());
+			combinedLastTwoObjects.setConjunction("assim como");
+			combinedLastTwoObjects.setFeature(Feature.RAISE_SPECIFIER, false);
+			if (gender.name().equals("FEMALE")) {
+				combinedLastTwoObjects.setFeature(InternalFeature.SPECIFIER, "uma"); // here
+			} else {
+				if (mostSpecificType.equals("http://dbpedia.org/ontology/SoccerClub")) {
+					combinedLastTwoObjects.setFeature(InternalFeature.SPECIFIER, "um"); // here
+				}
+			}
+			phrase2.setObject(combinedLastTwoObjects);
+		}
+
+		Iterator<SPhraseSpec> iterator = typePhrases.iterator();
+		// pick first phrase as representative
+		SPhraseSpec representative = iterator.next();
+		combinedObject.addCoordinate(representative.getObject());
+
+		while (iterator.hasNext()) {
+			SPhraseSpec phrase = iterator.next();
+			NLGElement object = phrase.getObject();
+			combinedObject.addCoordinate(object);
+		}
+
+		combinedObject.setFeature(Feature.RAISE_SPECIFIER, true);
+
+		// set the coordinated phrase as the object
+		representative.setObject(combinedObject);
+		// return a single phrase
+		typePhrases = Lists.newArrayList(representative);
+		return typePhrases;
 	}
 
 	/**
@@ -308,10 +338,10 @@ public class DocumentGeneratorPortuguese {
 		for (Iterator<Entry<Node, Collection<Triple>>> iterator = mapSubjectsToTriples.entrySet().iterator(); iterator
 				.hasNext(); entry = iterator.next()) {
 			Node subject = entry.getKey();
-			
+
 			if (!subjectsThatAppearAsObject.contains(subject)) {
 				sortedTriples.put(subject, entry.getValue());
-			
+
 				iterator.remove();
 			}
 		}

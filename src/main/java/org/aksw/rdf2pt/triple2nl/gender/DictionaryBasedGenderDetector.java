@@ -38,12 +38,6 @@ public class DictionaryBasedGenderDetector implements GenderDetector {
 	public DictionaryBasedGenderDetector(GenderDictionary dictionary) {
 		this.dictionary = dictionary;
 	}
-
-	public static void main(String[] args) throws Exception {
-		DictionaryBasedGenderDetector genderDetector = new DictionaryBasedGenderDetector();
-		System.out.println(genderDetector.getGender("Tarsila do Amaral"));
-	}
-
 	/*
 	 * (non-Javadoc) @see
 	 * org.aksw.sparql2nl.entitysummarizer.gender.GenderDetector#getGender(java.lang.String)
